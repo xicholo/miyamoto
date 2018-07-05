@@ -26,6 +26,7 @@ loadTimesheets = function (exports) {
 
     // コマンド集
     var commands = [
+      ['actionBreakTime', /休憩.*\d+.*(分|min)?/],
       ['actionSignOut', /(バ[ー〜ァ]*イ|ば[ー〜ぁ]*い|おやすみ|お[つっ]ー|おつ|さらば|お先|お疲|帰|乙|bye|night|(c|see)\s*(u|you)|退勤|ごきげんよ|グ[ッ]?バイ)/],
       ['actionWhoIsOff', /(だれ|誰|who\s*is).*(休|やす(ま|み|む))/],
       ['actionWhoIsIn', /(だれ|誰|who\s*is)/],
@@ -80,6 +81,18 @@ loadTimesheets = function (exports) {
           this.responder.template("退勤更新", username, this.datetimeStr);
         }
       }
+    }
+  };
+
+  // 休憩
+  Timesheets.prototype.actionBreakTime = function(username, message) {
+    if(this.datetime) {
+      var data = this.storage.get(username, this.datetime);
+        var breakTimeMin = message.match(/\d+/);
+        if(breakTimeMin != null){
+          this.storage.set(username, this.datetime, {breakTime: breakTimeMin});
+          this.responder.template("休憩", username, breakTimeMin);
+        }
     }
   };
 
