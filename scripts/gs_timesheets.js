@@ -12,10 +12,13 @@ loadGSTimesheets = function () {
         { name: '日付' },
         { name: '出勤' },
         { name: '退勤' },
-        { name: 'ノート' },
+        { name: '休憩（分）' },
+        { name: '合計（時間）' },
+        { name: '備考' },
       ],
       properties: [
-        { name: 'DayOff', value: '土,日', comment: '← 月,火,水みたいに入力してください。アカウント停止のためには「全部」と入れてください。'},
+        { name: 'DayOff', value: '', comment: '← 月,火,水みたいに入力してください。アカウント停止のためには「全部」と入れてください。'},
+        { name: 'BreakTime', value: '60', comment: '基本の休憩時間'},
       ]
     };
   };
@@ -69,17 +72,26 @@ loadGSTimesheets = function () {
       return v === '' ? undefined : v;
     });
 
-    return({ user: username, date: row[0], signIn: row[1], signOut: row[2], note: row[3] });
+    return({ user: username, date: row[0], signIn: row[1], signOut: row[2], breakTime: row[3], total:row[4], note: row[5] });
   };
 
   GSTimesheets.prototype.set = function(username, date, params) {
     var row = this.get(username, date);
-    _.extend(row, _.pick(params, 'signIn', 'signOut', 'note'));
+    _.extend(row, _.pick(params, 'signIn', 'signOut', 'breakTime', 'note'));
 
     var sheet = this._getSheet(username);
     var rowNo = this._getRowNo(username, date);
 
-    var data = [DateUtils.toDate(date), row.signIn, row.signOut, row.note].map(function(v) {
+    if(row.breakTime == null){
+      row.breakTime = sheet.getRange("B3").getValue();
+    }
+
+    // 合計時間の計算
+    if(row.signIn != null && row.signOut != null){
+      row.total = Math.floor(Math.floor((new Date(row.signOut).getTime() - new Date(row.signIn).getTime()) / 60000 - row.breakTime) / 15) / 4;
+    }
+
+    var data = [DateUtils.toDate(date), row.signIn, row.signOut, row.breakTime, row.total, row.note].map(function(v) {
       return v == null ? '' : v;
     });
     sheet.getRange("A"+rowNo+":"+String.fromCharCode(65 + this.scheme.columns.length - 1)+rowNo).setValues([data]);

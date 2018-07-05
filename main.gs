@@ -29,8 +29,8 @@ loadDateUtils = function () {
 
       // 1時20, 2:30, 3:00pm
       if(matches[2] != null) {
-        hour = parseInt(matches[2]);
-        min = parseInt(matches[3] ? matches[3] : '0');
+        hour = parseInt(matches[2], 10);
+        min = parseInt(matches[3] ? matches[3] : '0', 10);
         if(_.contains(['pm'], matches[4])) {
           hour += 12;
         }
@@ -38,8 +38,8 @@ loadDateUtils = function () {
 
       // 午後1 午後2時30 pm3
       if(matches[5] != null) {
-        hour = parseInt(matches[6]);
-        min = parseInt(matches[8] ? matches[8] : '0');
+        hour = parseInt(matches[6], 10);
+        min = parseInt(matches[8] ? matches[8] : '0', 10);
         if(_.contains(['pm', '午後'], matches[5])) {
           hour += 12;
         }
@@ -47,8 +47,8 @@ loadDateUtils = function () {
 
       // 1am 2:30pm
       if(matches[9] != null) {
-        hour = parseInt(matches[9]);
-        min = parseInt(matches[11] ? matches[11] : '0');
+        hour = parseInt(matches[9], 10);
+        min = parseInt(matches[11] ? matches[11] : '0', 10);
         if(_.contains(['pm'], matches[12])) {
           hour += 12;
         }
@@ -56,7 +56,7 @@ loadDateUtils = function () {
 
       // 14時
       if(matches[13] != null) {
-        hour = parseInt(matches[13]);
+        hour = parseInt(matches[13], 10);
         min = 0;
       }
 
@@ -88,9 +88,9 @@ loadDateUtils = function () {
     var reg = /((\d{4})[-\/年]{1}|)(\d{1,2})[-\/月]{1}(\d{1,2})/;
     var matches = str.match(reg);
     if(matches) {
-      var year = parseInt(matches[2]);
-      var month = parseInt(matches[3]);
-      var day = parseInt(matches[4]);
+      var year = parseInt(matches[2], 10);
+      var month = parseInt(matches[3], 10);
+      var day = parseInt(matches[4], 10);
       if(_.isNaN(year) || year < 1970) {
         //
         if((now().getMonth() + 1) >= 11 && month <= 2) {
@@ -264,14 +264,14 @@ checkUpdate = function(responder) {
   if(typeof GASProperties === 'undefined') GASProperties = loadGASProperties();
   var current_version = parseFloat(new GASProperties().get('version')) || 0;
 
-  var response = UrlFetchApp.fetch("https://raw.githubusercontent.com/masuidrive/miyamoto/master/VERSION", {muteHttpExceptions: true});
+  var response = UrlFetchApp.fetch("https://raw.githubusercontent.com/xicholo/miyamoto/master/VERSION", {muteHttpExceptions: true});
 
   if(response.getResponseCode() == 200) {
     var latest_version = parseFloat(response.getContentText());
     if(latest_version > 0 && latest_version > current_version) {
-      responder.send("最新のみやもとさんの準備ができました！\nhttps://github.com/masuidrive/miyamoto/blob/master/UPDATE.md を読んでください。");
+      responder.send("最新のみやもとさんの準備ができました！\nhttps://github.com/xicholo/miyamoto/blob/master/UPDATE.md を読んでください。");
 
-      var response = UrlFetchApp.fetch("https://raw.githubusercontent.com/masuidrive/miyamoto/master/HISTORY.md", {muteHttpExceptions: true});
+      var response = UrlFetchApp.fetch("https://raw.githubusercontent.com/xicholo/miyamoto/master/HISTORY.md", {muteHttpExceptions: true});
       if(response.getResponseCode() == 200) {
         var text = String(response.getContentText()).replace(new RegExp("## "+current_version+"[\\s\\S]*", "m"), '');
         responder.send(text);
@@ -358,14 +358,15 @@ loadGSTemplate = function() {
       }
       else {
         var now = DateUtils.now();
-        this.sheet.getRange("A1:L2").setValues([
+        this.sheet.getRange("A1:M2").setValues([
           [
-            "出勤", "出勤更新", "退勤", "退勤更新", "休暇", "休暇取消",
+            "出勤", "出勤更新", "退勤", "退勤更新", "休憩", "休暇", "休暇取消",
             "出勤中", "出勤なし", "休暇中", "休暇なし", "出勤確認", "退勤確認"
           ],
           [
             "<@#1> おはようございます (#2)", "<@#1> 出勤時間を#2へ変更しました",
             "<@#1> お疲れ様でした (#2)", "<@#1> 退勤時間を#2へ変更しました",
+            "<@#1> 休憩時間を#2分に設定しました",
             "<@#1> #2を休暇として登録しました", "<@#1> #2の休暇を取り消しました",
             "#1が出勤しています", "全員退勤しています",
             "#1は#2が休暇です", "#1に休暇の人はいません",
@@ -430,10 +431,13 @@ loadGSTimesheets = function () {
         { name: '日付' },
         { name: '出勤' },
         { name: '退勤' },
-        { name: 'ノート' },
+        { name: '休憩（分）' },
+        { name: '合計（時間）' },
+        { name: '備考' },
       ],
       properties: [
-        { name: 'DayOff', value: '土,日', comment: '← 月,火,水みたいに入力してください。アカウント停止のためには「全部」と入れてください。'},
+        { name: 'DayOff', value: '', comment: '← 月,火,水みたいに入力してください。アカウント停止のためには「全部」と入れてください。'},
+        { name: 'BreakTime', value: '60', comment: '基本の休憩時間'},
       ]
     };
   };
@@ -487,17 +491,26 @@ loadGSTimesheets = function () {
       return v === '' ? undefined : v;
     });
 
-    return({ user: username, date: row[0], signIn: row[1], signOut: row[2], note: row[3] });
+    return({ user: username, date: row[0], signIn: row[1], signOut: row[2], breakTime: row[3], total:row[4], note: row[5] });
   };
 
   GSTimesheets.prototype.set = function(username, date, params) {
     var row = this.get(username, date);
-    _.extend(row, _.pick(params, 'signIn', 'signOut', 'note'));
+    _.extend(row, _.pick(params, 'signIn', 'signOut', 'breakTime', 'note'));
 
     var sheet = this._getSheet(username);
     var rowNo = this._getRowNo(username, date);
 
-    var data = [DateUtils.toDate(date), row.signIn, row.signOut, row.note].map(function(v) {
+    if(row.breakTime == null){
+      row.breakTime = sheet.getRange("B3").getValue();
+    }
+
+    // 合計時間の計算
+    if(row.signIn != null && row.signOut != null){
+      row.total = Math.floor(Math.floor((new Date(row.signOut).getTime() - new Date(row.signIn).getTime()) / 60000 - row.breakTime) / 15) / 4;
+    }
+
+    var data = [DateUtils.toDate(date), row.signIn, row.signOut, row.breakTime, row.total, row.note].map(function(v) {
       return v == null ? '' : v;
     });
     sheet.getRange("A"+rowNo+":"+String.fromCharCode(65 + this.scheme.columns.length - 1)+rowNo).setValues([data]);
@@ -643,7 +656,7 @@ function migrate() {
   if(typeof GASProperties === 'undefined') GASProperties = loadGASProperties();
 
   var global_settings = new GASProperties();
-  global_settings.set('version', "20141027.0");
+  global_settings.set('version', "20180705.0");
   console.log("バージョンアップが完了しました。");
 }
 
@@ -740,6 +753,7 @@ loadTimesheets = function (exports) {
 
     // コマンド集
     var commands = [
+      ['actionBreakTime', /休憩.*\d+.*(分|min)?/],
       ['actionSignOut', /(バ[ー〜ァ]*イ|ば[ー〜ぁ]*い|おやすみ|お[つっ]ー|おつ|さらば|お先|お疲|帰|乙|bye|night|(c|see)\s*(u|you)|退勤|ごきげんよ|グ[ッ]?バイ)/],
       ['actionWhoIsOff', /(だれ|誰|who\s*is).*(休|やす(ま|み|む))/],
       ['actionWhoIsIn', /(だれ|誰|who\s*is)/],
@@ -794,6 +808,18 @@ loadTimesheets = function (exports) {
           this.responder.template("退勤更新", username, this.datetimeStr);
         }
       }
+    }
+  };
+
+  // 休憩
+  Timesheets.prototype.actionBreakTime = function(username, message) {
+    if(this.datetime) {
+      var data = this.storage.get(username, this.datetime);
+        var breakTimeMin = message.match(/\d+/);
+        if(breakTimeMin != null){
+          this.storage.set(username, this.datetime, {breakTime: breakTimeMin});
+          this.responder.template("休憩", username, breakTimeMin);
+        }
     }
   };
 
