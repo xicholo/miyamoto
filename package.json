@@ -1,4 +1,10 @@
 {
+  "scripts": {
+    "build": "make build",
+    "test": "node testrunner.js",
+    "download": "gas download -c ./gas-config.json",
+    "upload": "gas upload -c ./gas-config.json"
+  },
   "dependencies": {
     "gas-manager": "^0.4.3",
     "qunit": "^0.7.5"
