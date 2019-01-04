@@ -13,7 +13,7 @@ loadGSTimesheets = function () {
         { name: '出勤' },
         { name: '退勤' },
         { name: '休憩（分）' },
-        { name: '合計（時間）' },
+        { name: '合計' },
         { name: '備考' },
       ],
       properties: [
@@ -42,10 +42,19 @@ loadGSTimesheets = function () {
           });
           sheet.getRange("A1:C"+(properties.length)).setValues(properties);
 
-          // ヘッダの書き出し
+          // ヘッダの書き出し（システム管理）
           var rowNo = properties.length + 2;
           var cols = this.scheme.columns.map(function(c) { return c.name; });
           sheet.getRange("A"+rowNo+":"+String.fromCharCode(65 + cols.length - 1)+rowNo).setValues([cols]);
+
+          // ヘッダの書き出し（システム管理外）
+          sheet.getRange('G5').setValue('予定出勤時間');
+          sheet.getRange('H5').setValue('予定退社時間');
+          sheet.getRange('I5').setValue('予定勤務時間');
+
+          // フォーマットの指定
+          sheet.getRange("B6:C1000").setNumberFormat('MM/dd HH:mm');
+          sheet.getRange("G6:I1000").setNumberFormat('HH:mm');
         }
         //this.on("newUser", username);
       }
@@ -88,7 +97,8 @@ loadGSTimesheets = function () {
 
     // 合計時間の計算
     if(row.signIn != null && row.signOut != null){
-      row.total = Math.floor(Math.floor((new Date(row.signOut).getTime() - new Date(row.signIn).getTime()) / 60000 - row.breakTime) / 15) / 4;
+      var workMin = (new Date(row.signOut).getTime() - new Date(row.signIn).getTime()) / 60000 - row.breakTime;
+      row.total = Math.floor(workMin / 60) + ':' + ('0' + workMin % 60).slice(-2);
     }
 
     var data = [DateUtils.toDate(date), row.signIn, row.signOut, row.breakTime, row.total, row.note].map(function(v) {

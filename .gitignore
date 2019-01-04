@@ -1,4 +1,7 @@
 .DS_Store
 .ruby-version
+main.gs
 gas-config.json
 /node_modules/
+.idea/
+yarn-error.log
